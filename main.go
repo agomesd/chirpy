@@ -1,12 +1,17 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
 
+	"github.com/agomesd/chirpy/internal/database"
 	"github.com/agomesd/chirpy/internal/handlers"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 const PORT = "8080"
@@ -14,6 +19,8 @@ const FILE_PATH_ROOT = "/"
 
 type apiConfig struct {
 	fileServerHits atomic.Int32
+	queries        *database.Queries
+	platform       string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -30,20 +37,44 @@ func (cfg *apiConfig) getFileServerHits(w http.ResponseWriter, _ *http.Request) 
 	w.Write([]byte(hits))
 }
 
-func (cfg *apiConfig) resetFileServerHits(_ http.ResponseWriter, _ *http.Request) {
+func (cfg *apiConfig) resetServer(w http.ResponseWriter, r *http.Request) {
+	if cfg.platform != "dev" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	cfg.queries.DeleteUsers(r.Context())
 	cfg.fileServerHits.Store(0)
 }
 
 func main() {
+	godotenv.Load()
+
+	dbURL := os.Getenv("DB_URL")
+	platform := os.Getenv("PLATFORM")
+
+	db, err := sql.Open("postgres", dbURL)
+
+	if err != nil {
+		log.Fatalf("Failed to open database: %s", err)
+	}
+
+	dbQueries := database.New(db)
+
 	mux := http.NewServeMux()
 
 	apiCfg := apiConfig{}
 
+	apiCfg.queries = dbQueries
+	apiCfg.platform = platform
+
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(".")))))
-	mux.HandleFunc("GET /api/healthz", handlers.Healthz)
+	mux.HandleFunc("GET /api/healthz", healthCheck)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.getFileServerHits)
-	mux.HandleFunc("POST /api/validate_chirp", handlers.ValidateChirp)
-	mux.HandleFunc("POST /admin/reset", apiCfg.resetFileServerHits)
+	mux.HandleFunc("POST /admin/reset", apiCfg.resetServer)
+	mux.HandleFunc("POST /api/users", handlers.HandleCreateUser(apiCfg.queries))
+	mux.HandleFunc("POST /api/chirps", handlers.HandleCreateChirp(apiCfg.queries))
+	mux.HandleFunc("GET /api/chirps", handlers.HandleGetChirps(apiCfg.queries))
+	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.HandleGetChirpByID(apiCfg.queries))
 
 	server := http.Server{
 		Handler: mux,
@@ -53,4 +84,11 @@ func main() {
 	log.Printf("Serving files from %s on port: %s\n", FILE_PATH_ROOT, PORT)
 	log.Fatal(server.ListenAndServe())
 
+}
+
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("charset", "utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK\n"))
 }
