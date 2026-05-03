@@ -4,7 +4,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
+
+var invalidWords = map[string]struct{}{
+	"kerfuffle": {},
+	"sharbert":  {},
+	"fornax":    {},
+}
 
 func Healthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -33,9 +40,11 @@ func ValidateChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	p.Body = sanitizeWords(p.Body)
+
 	respondWithJSON(w, http.StatusOK, struct {
-		Valid bool `json:"valid"`
-	}{Valid: true})
+		CleanedBody string `json:"cleaned_body"`
+	}{CleanedBody: p.Body})
 
 }
 
@@ -72,4 +81,16 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	w.Write(respBody)
+}
+
+func sanitizeWords(s string) string {
+	words := strings.Split(s, " ")
+
+	for idx, word := range words {
+		if _, ok := invalidWords[strings.ToLower(word)]; ok {
+			words[idx] = "****"
+		}
+	}
+
+	return strings.Join(words, " ")
 }
