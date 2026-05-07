@@ -28,6 +28,59 @@ type UserService struct {
 	JWTSecret string
 }
 
+func (s *UserService) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
+	accessToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	userID, err := auth.ValidateJWT(accessToken, s.JWTSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	type requestBody struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	reqBody := requestBody{}
+
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	decoder.Decode(&reqBody)
+
+	newHashedPassword, err := auth.HashPassword(reqBody.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	params := database.UpdateUserPasswordParams{
+		HashedPassword: newHashedPassword,
+		ID:             userID,
+		Email:          reqBody.Email,
+	}
+
+	updatedUserDB, err := s.DB.UpdateUserPassword(r.Context(), params)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	user := User{
+		ID:        updatedUserDB.ID,
+		CreatedAt: updatedUserDB.CreatedAt.String(),
+		UpdatedAt: updatedUserDB.UpdatedAt.String(),
+		Email:     updatedUserDB.Email,
+	}
+
+	respondWithJSON(w, http.StatusOK, user)
+}
+
 func (s *UserService) HandleCreatUser(w http.ResponseWriter, r *http.Request) {
 	type requestBody struct {
 		Email    string `json:"email"`
