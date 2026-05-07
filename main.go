@@ -86,6 +86,9 @@ func main() {
 
 	mux.HandleFunc("POST /api/users", userService.HandleCreatUser)
 	mux.HandleFunc("POST /api/login", userService.HandleLoginUser)
+	mux.HandleFunc("POST /api/refresh", userService.HandleRefreshToken)
+	mux.HandleFunc("POST /api/revoke", userService.HandleRevokeToken)
+
 	mux.HandleFunc("POST /api/chirps", chirpService.HandleCreateChirp)
 	mux.HandleFunc("GET /api/chirps", chirpService.HandleGetChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", chirpService.HandleGetChirpByID)
