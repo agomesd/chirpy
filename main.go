@@ -21,6 +21,7 @@ type apiConfig struct {
 	fileServerHits atomic.Int32
 	queries        *database.Queries
 	platform       string
+	secret         string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -51,6 +52,7 @@ func main() {
 
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
+	secret := os.Getenv("SECRET")
 
 	db, err := sql.Open("postgres", dbURL)
 
@@ -66,16 +68,27 @@ func main() {
 
 	apiCfg.queries = dbQueries
 	apiCfg.platform = platform
+	apiCfg.secret = secret
+
+	userService := handlers.UserService{}
+	chirpService := handlers.ChirpService{}
+
+	userService.DB = apiCfg.queries
+	userService.JWTSecret = apiCfg.secret
+
+	chirpService.DB = apiCfg.queries
+	chirpService.JWTSecret = apiCfg.secret
 
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /api/healthz", healthCheck)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.getFileServerHits)
 	mux.HandleFunc("POST /admin/reset", apiCfg.resetServer)
-	mux.HandleFunc("POST /api/users", handlers.HandleCreateUser(apiCfg.queries))
-	mux.HandleFunc("POST /api/login", handlers.HandleLoginUser(apiCfg.queries))
-	mux.HandleFunc("POST /api/chirps", handlers.HandleCreateChirp(apiCfg.queries))
-	mux.HandleFunc("GET /api/chirps", handlers.HandleGetChirps(apiCfg.queries))
-	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.HandleGetChirpByID(apiCfg.queries))
+
+	mux.HandleFunc("POST /api/users", userService.HandleCreatUser)
+	mux.HandleFunc("POST /api/login", userService.HandleLoginUser)
+	mux.HandleFunc("POST /api/chirps", chirpService.HandleCreateChirp)
+	mux.HandleFunc("GET /api/chirps", chirpService.HandleGetChirps)
+	mux.HandleFunc("GET /api/chirps/{chirpID}", chirpService.HandleGetChirpByID)
 
 	server := http.Server{
 		Handler: mux,
