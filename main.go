@@ -72,6 +72,7 @@ func main() {
 	mux.HandleFunc("GET /admin/metrics", apiCfg.getFileServerHits)
 	mux.HandleFunc("POST /admin/reset", apiCfg.resetServer)
 	mux.HandleFunc("POST /api/users", handlers.HandleCreateUser(apiCfg.queries))
+	mux.HandleFunc("POST /api/login", handlers.HandleLoginUser(apiCfg.queries))
 	mux.HandleFunc("POST /api/chirps", handlers.HandleCreateChirp(apiCfg.queries))
 	mux.HandleFunc("GET /api/chirps", handlers.HandleGetChirps(apiCfg.queries))
 	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.HandleGetChirpByID(apiCfg.queries))
