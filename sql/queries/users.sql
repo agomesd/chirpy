@@ -1,10 +1,7 @@
 -- name: CreateUser :one
 INSERT INTO users (id, email, hashed_password)
 VALUES (gen_random_uuid(), $1, $2)
-RETURNING id,
-    email,
-    created_at,
-    updated_at;
+RETURNING *;
 -- name: DeleteUsers :exec
 DELETE FROM users;
 -- name: GetUserByEmail :one
@@ -16,5 +13,10 @@ UPDATE users
 SET email = $2,
     hashed_password = $3,
     updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+-- name: UpgradeUserChirpyRed :one
+UPDATE users
+SET is_chirpy_red = TRUE
 WHERE id = $1
 RETURNING *;

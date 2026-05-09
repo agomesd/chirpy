@@ -22,6 +22,7 @@ type apiConfig struct {
 	queries        *database.Queries
 	platform       string
 	secret         string
+	polkaKey       string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -53,6 +54,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
 	secret := os.Getenv("SECRET")
+	polkaKey := os.Getenv("POLKA_KEY")
 
 	db, err := sql.Open("postgres", dbURL)
 
@@ -69,9 +71,11 @@ func main() {
 	apiCfg.queries = dbQueries
 	apiCfg.platform = platform
 	apiCfg.secret = secret
+	apiCfg.polkaKey = polkaKey
 
 	userService := handlers.UserService{}
 	chirpService := handlers.ChirpService{}
+	webhookService := handlers.WebhookService{}
 
 	userService.DB = apiCfg.queries
 	userService.JWTSecret = apiCfg.secret
@@ -79,13 +83,16 @@ func main() {
 	chirpService.DB = apiCfg.queries
 	chirpService.JWTSecret = apiCfg.secret
 
+	webhookService.DB = apiCfg.queries
+	webhookService.APIKey = apiCfg.polkaKey
+
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(".")))))
 	mux.HandleFunc("GET /api/healthz", healthCheck)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.getFileServerHits)
 	mux.HandleFunc("POST /admin/reset", apiCfg.resetServer)
 
-	mux.HandleFunc("POST /api/users", userService.HandleCreatUser)
-	mux.HandleFunc("PUT /api/users", userService.HandleUpdateUser)
+	mux.HandleFunc("POST /api/users", userService.HandleCreateUser)
+	mux.HandleFunc("PUT /api/users", userService.HandleUpdateUserEmailPassword)
 	mux.HandleFunc("POST /api/login", userService.HandleLoginUser)
 	mux.HandleFunc("POST /api/refresh", userService.HandleRefreshToken)
 	mux.HandleFunc("POST /api/revoke", userService.HandleRevokeToken)
@@ -93,6 +100,9 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", chirpService.HandleCreateChirp)
 	mux.HandleFunc("GET /api/chirps", chirpService.HandleGetChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", chirpService.HandleGetChirpByID)
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", chirpService.HandleDeleteChirp)
+
+	mux.HandleFunc("POST /api/polka/webhooks", webhookService.HandlePolkaWebhook)
 
 	server := http.Server{
 		Handler: mux,

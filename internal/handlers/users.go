@@ -15,6 +15,7 @@ type User struct {
 	CreatedAt    string    `json:"created_at"`
 	UpdatedAt    string    `json:"updated_at"`
 	Email        string    `json:"email"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 	Token        string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
 }
@@ -28,7 +29,7 @@ type UserService struct {
 	JWTSecret string
 }
 
-func (s *UserService) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
+func (s *UserService) HandleUpdateUserEmailPassword(w http.ResponseWriter, r *http.Request) {
 	accessToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, err.Error())
@@ -72,16 +73,17 @@ func (s *UserService) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := User{
-		ID:        updatedUserDB.ID,
-		CreatedAt: updatedUserDB.CreatedAt.String(),
-		UpdatedAt: updatedUserDB.UpdatedAt.String(),
-		Email:     updatedUserDB.Email,
+		ID:          updatedUserDB.ID,
+		CreatedAt:   updatedUserDB.CreatedAt.String(),
+		UpdatedAt:   updatedUserDB.UpdatedAt.String(),
+		Email:       updatedUserDB.Email,
+		IsChirpyRed: updatedUserDB.IsChirpyRed.Bool,
 	}
 
 	respondWithJSON(w, http.StatusOK, user)
 }
 
-func (s *UserService) HandleCreatUser(w http.ResponseWriter, r *http.Request) {
+func (s *UserService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	type requestBody struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -115,10 +117,11 @@ func (s *UserService) HandleCreatUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := User{
-		ID:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt.String(),
-		UpdatedAt: dbUser.UpdatedAt.String(),
-		Email:     dbUser.Email,
+		ID:          dbUser.ID,
+		CreatedAt:   dbUser.CreatedAt.String(),
+		UpdatedAt:   dbUser.UpdatedAt.String(),
+		Email:       dbUser.Email,
+		IsChirpyRed: dbUser.IsChirpyRed.Bool,
 	}
 
 	respondWithJSON(w, http.StatusCreated, user)
@@ -179,6 +182,7 @@ func (s *UserService) HandleLoginUser(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    userDB.CreatedAt.String(),
 		UpdatedAt:    userDB.UpdatedAt.String(),
 		Email:        userDB.Email,
+		IsChirpyRed:  userDB.IsChirpyRed.Bool,
 		Token:        token,
 		RefreshToken: refreshTokenDB.Token,
 	}

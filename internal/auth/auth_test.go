@@ -272,3 +272,91 @@ func TestGetBearerToken(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAPIKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		headers http.Header
+		wantKey string
+		wantErr bool
+	}{
+		{
+			name:    "valid api key",
+			headers: http.Header{"Authorization": []string{"ApiKey myapikey123"}},
+			wantKey: "myapikey123",
+			wantErr: false,
+		},
+		{
+			name:    "case insensitive scheme - lowercase apikey",
+			headers: http.Header{"Authorization": []string{"apikey myapikey123"}},
+			wantKey: "myapikey123",
+			wantErr: false,
+		},
+		{
+			name:    "case insensitive scheme - uppercase APIKEY",
+			headers: http.Header{"Authorization": []string{"APIKEY myapikey123"}},
+			wantKey: "myapikey123",
+			wantErr: false,
+		},
+		{
+			name:    "key with trailing whitespace",
+			headers: http.Header{"Authorization": []string{"ApiKey myapikey123  "}},
+			wantKey: "myapikey123",
+			wantErr: false,
+		},
+		{
+			name:    "key with spaces preserved via SplitN",
+			headers: http.Header{"Authorization": []string{"ApiKey key with spaces"}},
+			wantKey: "key with spaces",
+			wantErr: false,
+		},
+		{
+			name:    "missing authorization header",
+			headers: http.Header{},
+			wantErr: true,
+		},
+		{
+			name:    "empty authorization header",
+			headers: http.Header{"Authorization": []string{""}},
+			wantErr: true,
+		},
+		{
+			name:    "apikey with no key",
+			headers: http.Header{"Authorization": []string{"ApiKey"}},
+			wantErr: true,
+		},
+		{
+			name:    "apikey with only whitespace",
+			headers: http.Header{"Authorization": []string{"ApiKey   "}},
+			wantErr: true,
+		},
+		{
+			name:    "wrong scheme - Bearer",
+			headers: http.Header{"Authorization": []string{"Bearer mytoken123"}},
+			wantErr: true,
+		},
+		{
+			name:    "wrong scheme - Basic auth",
+			headers: http.Header{"Authorization": []string{"Basic dXNlcjpwYXNz"}},
+			wantErr: true,
+		},
+		{
+			name:    "no scheme - just key",
+			headers: http.Header{"Authorization": []string{"myapikey123"}},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetAPIKey(tt.headers)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetAPIKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.wantKey {
+				t.Errorf("GetAPIKey() = %q, want %q", got, tt.wantKey)
+			}
+		})
+	}
+}

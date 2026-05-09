@@ -23,6 +23,43 @@ type ChirpService struct {
 	JWTSecret string
 }
 
+func (s *ChirpService) HandleDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	accessToken, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	userID, err := auth.ValidateJWT(accessToken, s.JWTSecret)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	chirpID := r.PathValue("chirpID")
+
+	chirpDB, err := s.DB.GetChirp(r.Context(), uuid.MustParse(chirpID))
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if chirpDB.UserID != userID {
+		respondWithError(w, http.StatusForbidden, "You do not have permission to delete this chirp.")
+		return
+	}
+
+	if err := s.DB.DeleteChirp(r.Context(), uuid.MustParse(chirpID)); err != nil {
+		respondWithError(w, http.StatusNotFound, "Not found.")
+		return
+	}
+
+	respondWithJSON(w, http.StatusNoContent, nil)
+
+}
+
 func (s *ChirpService) HandleGetChirpByID(w http.ResponseWriter, r *http.Request) {
 	chirpID := r.PathValue("chirpID")
 
