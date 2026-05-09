@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/hex"
 	"net/http"
 	"testing"
 	"time"
@@ -358,5 +359,48 @@ func TestGetAPIKey(t *testing.T) {
 				t.Errorf("GetAPIKey() = %q, want %q", got, tt.wantKey)
 			}
 		})
+	}
+}
+
+func TestHashPasswordAndCheckPassword(t *testing.T) {
+	password := "correct horse battery staple"
+
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatalf("HashPassword() error = %v", err)
+	}
+	if hash == "" || hash == password {
+		t.Fatalf("hash should be non-empty and not equal to plaintext password")
+	}
+
+	ok, err := CheckPasswordHash(password, hash)
+	if err != nil {
+		t.Fatalf("CheckPasswordHash() error = %v", err)
+	}
+	if !ok {
+		t.Fatal("CheckPasswordHash() should succeed for matching password")
+	}
+
+	okWrong, err := CheckPasswordHash("wrong-password", hash)
+	if err != nil {
+		t.Fatalf("CheckPasswordHash wrong pass error = %v", err)
+	}
+	if okWrong {
+		t.Fatal("CheckPasswordHash() should reject wrong password")
+	}
+}
+
+func TestMakeRefreshToken(t *testing.T) {
+	a := MakeRefreshToken()
+	b := MakeRefreshToken()
+
+	if len(a) != 64 {
+		t.Errorf("MakeRefreshToken() length = %d; want 64 (32-byte hex)", len(a))
+	}
+	if _, err := hex.DecodeString(a); err != nil {
+		t.Errorf("MakeRefreshToken() not valid hex: %v", err)
+	}
+	if a == b {
+		t.Fatal("two refresh tokens collided — extremely unlikely")
 	}
 }

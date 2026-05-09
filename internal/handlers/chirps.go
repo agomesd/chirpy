@@ -3,11 +3,11 @@ package handlers
 import (
 	"encoding/json"
 
-	"net/http"
-
 	"github.com/agomesd/chirpy/internal/auth"
 	"github.com/agomesd/chirpy/internal/database"
 	"github.com/google/uuid"
+	"net/http"
+	"sort"
 )
 
 type Chirp struct {
@@ -82,18 +82,43 @@ func (s *ChirpService) HandleGetChirpByID(w http.ResponseWriter, r *http.Request
 }
 
 func (s *ChirpService) HandleGetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps := []database.Chirp{}
+	type Chirp struct {
+		ID        string `json:"id"`
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+		Body      string `json:"body"`
+		UserID    string `json:"user_id"`
+	}
 
-	chirpsDB, err := s.DB.GetChirps(r.Context())
+	authorID := r.URL.Query().Get("author_id")
+	sortParam := r.URL.Query().Get("sort")
+
+	var err error
+	if authorID != "" {
+		var id uuid.UUID
+		id, err = uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "invalid author_id")
+			return
+		}
+		chirps, err = s.DB.GetChirpsByUserId(r.Context(), id)
+	} else {
+		chirps, err = s.DB.GetChirps(r.Context())
+	}
+
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondWithError(w, http.StatusInternalServerError, "couldn't fetch chirps")
 		return
 	}
 
-	chirps := []Chirp{}
+	if sortParam == "desc" {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
+	}
 
-	for _, chirp := range chirpsDB {
-
-		chirps = append(chirps, Chirp{
+	parsedChirps := []Chirp{}
+	for _, chirp := range chirps {
+		parsedChirps = append(parsedChirps, Chirp{
 			ID:        chirp.ID.String(),
 			CreatedAt: chirp.CreatedAt.String(),
 			UpdatedAt: chirp.UpdatedAt.String(),
@@ -102,7 +127,7 @@ func (s *ChirpService) HandleGetChirps(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	respondWithJSON(w, http.StatusOK, chirps)
+	respondWithJSON(w, http.StatusOK, parsedChirps)
 
 }
 

@@ -102,6 +102,7 @@ func (s *UserService) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid authentication")
+		return
 	}
 
 	params := database.CreateUserParams{
